@@ -1,0 +1,16 @@
+/*
+ * Copyright (c) 2020, Irnas
+ *
+ */
+
+&uart1 {
+	status = "disabled";
+};
+&spi3 {
+    //sck-pin = <13>;
+    //miso-pin = <12>;
+    //mosi-pin = <11>;
+    sck-pin = <24>;
+    miso-pin = <23>;
+    mosi-pin = <22>;
+};

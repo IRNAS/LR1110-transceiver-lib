@@ -1,0 +1,8 @@
+/*
+ * Copyright (c) 2020, Irnas
+ *
+ */
+
+&uart1 {
+	status = "disabled";
+};
