@@ -16,7 +16,7 @@ if (NOT DEFINED NO_EXAMPLES)
     set(CMAKE_BUILD_TYPE Debug)
 
     # Change line below if you want to change example folder that will be used
-    set(EXAMPLE_APPLICATION "version_check")
+    set(EXAMPLE_APPLICATION "wifi_scan")
     # Change line below to the board that you will be using
     add_definitions(-DDEVICE_BOARD="NRF52840")
 

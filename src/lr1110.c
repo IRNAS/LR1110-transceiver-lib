@@ -95,57 +95,98 @@ void lr1110_init_wifi_scan(void * context)
     ( ( 1 << LR1110_WIFI_CHANNEL_11 ) + ( 1 << LR1110_WIFI_CHANNEL_6 ) + \
       ( 1 << LR1110_WIFI_CHANNEL_1 ) )
 
-void lr1110_execute_wifi_scan(void * context)
+struct wifi_scan_settings lr1110_get_default_wifi_scan_settings(void * context)
 {
-   // Scan wifi
-    // Scan for all types of wifi
-    lr1110_wifi_signal_type_scan_t signal_type = LR1110_WIFI_TYPE_SCAN_B_G_N; //change
-    // Scan all channels
-    lr1110_wifi_channel_mask_t channels = DEMO_WIFI_CHANNELS_DEFAULT;    
-    // Wifi capture scan mode
-    lr1110_wifi_mode_t scan_mode = LR1110_WIFI_SCAN_MODE_BEACON_AND_PKT;
-    //Max number of results, less or equal to 32
-    uint8_t max_results = 32; //LR1110_WIFI_MAX_RESULTS;
-    // Number of passive Wi-fi scans to be executed per chanell, 1 to 255
-    uint8_t nb_scan_per_channel = 20;
-    // Timeout in ms
-    uint16_t timeout_in_ms = 100;
-    // Abort on timeout, if true, then if above timeout is reached, 
-    // we jump to next channel
-    bool abort_on_timeout = true;
+    struct wifi_scan_settings wifi_scan_settings = {
+        .signal_type = LR1110_WIFI_TYPE_SCAN_B_G_N,
+        .channels = LR1110_WIFI_ALL_CHANNELS,
+        .scan_mode = LR1110_WIFI_SCAN_MODE_BEACON_AND_PKT,
+        .max_results = LR1110_WIFI_MAX_RESULTS,
+        .nb_scan_per_channel = 20,
+        .timeout_in_ms = 100,
+        .abort_on_timeout = true,
+    };
+    return wifi_scan_settings;
+}
 
-    // Mark time before starting scan and before finishing
+void lr1110_prepare_event(void * context, lr1110_system_irq_mask_t event_mask)
+{
+    lr1110_system_set_dio_irq_params(context, event_mask, 0);
+}
+
+void lr1110_wait_for_event(void * context)
+{
+	while (0 == gpio_pin_get(((lr1110_t*) context)->event.port, 
+                             ((lr1110_t*) context)->event.pin));
+}
+
+void lr1110_clear_event(void * context, lr1110_system_irq_mask_t event_mask)
+{
+    lr1110_system_clear_irq_status(context,  event_mask);
+}
+
+struct wifi_scan_dia_results
+lr1110_execute_wifi_scan(void * context, 
+                         struct wifi_scan_settings wifi_scan_settings)
+{
+    struct wifi_scan_dia_results wifi_scan_dia_results = {0};
+
+    /* Prepare event intterupt line*/
+    lr1110_prepare_event(context, LR1110_SYSTEM_IRQ_WIFI_SCAN_DONE);
+
     uint32_t start_scan = k_uptime_get();
 
-    lr1110_wifi_scan(context, signal_type, channels, scan_mode, max_results, 
-            nb_scan_per_channel, timeout_in_ms, abort_on_timeout);
+    lr1110_wifi_scan(context, 
+                     wifi_scan_settings.signal_type, 
+                     wifi_scan_settings.channels, 
+                     wifi_scan_settings.scan_mode, 
+                     wifi_scan_settings.max_results, 
+                     wifi_scan_settings.nb_scan_per_channel, 
+                     wifi_scan_settings.timeout_in_ms, 
+                     wifi_scan_settings.abort_on_timeout);
 
+    lr1110_wait_for_event(context);
     uint32_t end_scan = k_uptime_get();
 
-    printk("Duration of wifi scan: %d\n", end_scan - start_scan);
+    wifi_scan_dia_results.wifi_scan_duration = end_scan - start_scan;
 
-    // Get number of results
-    uint8_t nb_results = 0;
+    /* Clear event intterupt line*/
+    lr1110_clear_event(context, LR1110_SYSTEM_IRQ_WIFI_SCAN_DONE);
+
     start_scan = k_uptime_get();
-    lr1110_wifi_get_nb_results(context, &nb_results);
+    lr1110_wifi_get_nb_results(context, 
+                               &wifi_scan_dia_results.num_wifi_results);
     end_scan = k_uptime_get();
 
-    printk("Number of wifi results: %d\n", nb_results);
-    printk("Duration of getting results: %d ms\n", end_scan - start_scan);
+    wifi_scan_dia_results.result_fetch_duration = end_scan - start_scan;
+    return wifi_scan_dia_results;
+}
 
-    // Get results
-    // Set index from where to read, 0-31
-    uint8_t start_result_index = 0;
-
-    lr1110_wifi_basic_complete_result_t results[LR1110_WIFI_MAX_RESULTS] = {0};
-
+void lr1110_get_wifi_scan_results(void * context, 
+                                  struct wifi_scan_dia_results wifi_scan_dia_results,
+                                  lr1110_wifi_basic_complete_result_t * results)
+{
     lr1110_wifi_read_basic_complete_results(context, 
-                                            start_result_index,
-                                            nb_results,  
+                                            0,  /* start result index */
+                                            wifi_scan_dia_results.num_wifi_results,
                                             results);
+}
 
-    // Print results
-    for (int i = 0; i < nb_results; i++)
+void lr1110_print_wifi_scan_results(void * contex,
+                                  struct wifi_scan_dia_results wifi_scan_dia_results,
+                                  lr1110_wifi_basic_complete_result_t * results)
+{
+
+    printk("--------------------------------------------------------------\n");
+    printk("Scan duration:          %d ms\n", 
+            wifi_scan_dia_results.wifi_scan_duration);
+    printk("Fetch result duration:  %d ms\n", 
+            wifi_scan_dia_results.result_fetch_duration);
+    printk("Number of wifi results: %d\n", 
+            wifi_scan_dia_results.num_wifi_results);
+
+    /* Print results*/
+    for (int i = 0; i < wifi_scan_dia_results.num_wifi_results; i++)
     {
         printk("{\n\t\"macAddress\": \"");
         for (int j = 0; j < LR1110_WIFI_MAC_ADDRESS_LENGTH; j++)
@@ -155,24 +196,6 @@ void lr1110_execute_wifi_scan(void * context)
         printk("\",\n\t\"signalStrength\": ");
         printk("%d\n},\n", results[i].rssi);
     }
-
-    //this->ExecuteScan( this->device->GetRadio( ) );
-
-    //lr1110_wifi_scan(context, DemoTransceiverWifiInterface::transceiver_wifi_scan_type_from_demo( this->settings.types ),
-    //                  this->settings.channels,
-    //                  DemoTransceiverWifiInterface::transceiver_wifi_mode_from_demo( this->settings.scan_mode ),
-    //                  this->settings.max_results, this->settings.nbr_retrials, this->settings.timeout,
-    //                  WIFI_SCAN_ABORT_ON_TIMEOUT );
-
-
-
-    //    //wait for scan to finish
-    //    
-    //    this->FetchAndSaveResults( this->device->GetRadio( ) );
-
-    //lr1110_wifi_cumulative_timings_t wifi_results_timings = { 0 };
-
-    //lr1110_wifi_read_cumulative_timing(context, &wifi_results_timings );
 }
 
 /* -------------------------------------------------------------------------
