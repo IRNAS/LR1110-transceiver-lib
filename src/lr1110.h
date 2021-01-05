@@ -18,6 +18,7 @@ extern "C" {
 #include <zephyr.h>
 #include <device.h>
 #include <drivers/gpio.h>
+#include "lr1110_driver/lr1110_system_types.h"
 
 /*!
  * @brief Struct for storing data about port and pin number for each physical
@@ -41,15 +42,21 @@ typedef struct
     port_pin_t busy;
     port_pin_t lna;
     char * spi_dev_label;
-    lr1110_hal_operating_mode_t op_mode;
-    lr1110_modem_system_rf_switch_cfg_t * rf_switch_cfg;
+    lr1110_system_rfswitch_cfg_t * rf_switch_cfg;
     void (*event_interrupt_cb)(void);
     gpio_flags_t event_trigger_type;
 } lr1110_t;
 
 
 void lr1110_init(const void * context);
-void lr1110_set_device_config(const void * context, const char * device);
+void lr1110_set_device_config(void * context, const char * device);
+
+void lr1110_get_trx_version(const void * context, 
+                            lr1110_system_version_t * lr1110_version);
+void lr1110_display_trx_version(lr1110_system_version_t lr1110_version);
+
+void lr1110_init_wifi_scan(void * context);
+void lr1110_execute_wifi_scan(void * context);
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,7 @@
  * COPYRIGHT NOTICE: (c) 2021 Irnas.  All rights reserved.
  */ 
 
+#include <string.h>
 #include "lr1110.h"
 #include "lr1110_configs.h"
 
@@ -180,7 +181,7 @@ static port_pin_t create_port_pin(port_label_t port, gpio_pin_t pin)
             while(1);
         break; 
     }
-    struct device * port_device = device_get_binding(port_label);
+    struct device * port_device = (struct device *) device_get_binding(port_label);
 
     port_pin_t created_port_pin = {
         .port = port_device, 

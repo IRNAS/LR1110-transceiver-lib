@@ -15,8 +15,11 @@
 extern "C" {
 #endif
 
+#include "lr1110_types.h"
+
 void lr1110_gpio_init(const void * context);
 void lr1110_spi_init(const void * context);
+lr1110_status_t lr1110_rf_switch_init(const void * context);
 
 #ifdef __cplusplus
 }

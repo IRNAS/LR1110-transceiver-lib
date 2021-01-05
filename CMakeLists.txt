@@ -25,13 +25,13 @@ endif()
 
 zephyr_include_directories(.)
 zephyr_include_directories(src)
-zephyr_include_directories(src/lr1110_driver/src)
+zephyr_include_directories(src/lr1110_driver)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 FILE(GLOB example_dir examples/${LR1110_EXAMPLE}/*.c)
 FILE(GLOB app_sources src/*.c)
-FILE(GLOB lr1110_driver_sources src/lr1110_driver/src/*.c)
+FILE(GLOB lr1110_driver_sources src/lr1110_driver/*.c)
 
 target_sources(app PRIVATE ${example_dir})
 target_sources(app PRIVATE ${app_sources})

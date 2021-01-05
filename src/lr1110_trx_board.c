@@ -16,36 +16,45 @@
 #include "lr1110_trx_board.h"
 #include "lr1110.h"
 #include "lr1110_driver/lr1110_hal.h"
+#include "lr1110_driver/lr1110_system.h"
+#include "lr1110_driver/lr1110_system_types.h"
 
 
 /* -------------------------------------------------------------------------
  * PRIVATE VARIABLES
  * ------------------------------------------------------------------------- */
-static struct device * spi_dev;
+static const struct device * spi_dev;
 static struct spi_config spi_cfg;
 
 
 /* -------------------------------------------------------------------------
  * PRIVATE PROTOTYPES
  * ------------------------------------------------------------------------- */
-static void lr1110_set_nss(cont void * context, uint8_t level);
-static lr1110_hal_status_t lr1110_hal_reset(const void * context);
-static lr1110_hal_status_t lr1110_hal_wakeup(const void * context);
+static void lr1110_set_nss(const void * context, uint8_t level);
 static lr1110_hal_status_t lr1110_hal_wait_busy(const void * context, 
                                                 uint32_t timeout_ms);
 static void lr1110_spi_write(const void * context,
                              const uint8_t * command, 
                              const uint16_t command_length);
-static void lr1110_spi_read(const void * context, 
-                            const uint8_t * command, 
+static void lr1110_spi_read(const void * context,
                             uint8_t * data, 
-                            const uint16_t data_length);
+                            uint16_t data_length);
+
+
+//static void lr1110_spi_read(const void * context,
+//                            uint8_t *command, 
+//                            uint8_t size_command,
+//                            uint8_t * data, 
+//                            uint16_t data_length);
+
+
 static void lr1110_spi_write_read(const void * context, 
                                   const uint8_t * command, 
                                   uint8_t * data,
                                   const uint16_t data_length);
+static lr1110_system_rfswitch_cfg_t create_evk_shield_rf_switch();
 
-
+lr1110_hal_status_t lr1110_hal_wakeup(const void * context);
 /* -------------------------------------------------------------------------
  * PUBLIC IMPLEMENTATIONS
  * ------------------------------------------------------------------------- */
@@ -106,44 +115,6 @@ void lr1110_spi_init(const void * context)
 
 
 /*!
- * @brief                       HAL read
- *
- * @param[in] context           Radio abstraction
- * @param[in] command           Pointer to the buffer to be transmitted
- * @param[in] command_length    Buffer size to be transmitted
- * @param[out] data             Pointer to the buffer to be received
- * @param[in] data_length       Buffer size to be received
- *
- * @return status               HAL status
- */
-lr1110_hal_status_t lr1110_hal_read(const void * context, 
-                                    const uint8_t * command, 
-                                    const uint16_t command_length, 
-                                    uint8_t * data, 
-                                    const uint16_t data_length)
-{
-    uint8_t dummy_byte = 0x00;
-
-    lr1110_hal_wait_busy(context, 2000);
-
-    /* 1st SPI transaction */
-    lr1110_set_nss(context, 0);
-    lr1110_spi_write(context, command, command_length);
-    lr1110_set_nss(context, 1);
-
-    lr1110_hal_wait_on_busy(context, 2000);
-
-    /* 2nd SPI transaction */
-    lr1110_set_nss(context, 0);
-    lr1110_spi_write(context, &dummy, 0);
-    lr1110_spi_read(context, data, data_length);
-    lr1110_set_nss(context, 1);
-
-    return LR1110_HAL_STATUS_OK;
-}
-
-
-/*!
  * @brief                       HAL write
  *
  * @param[in] context           Radio abstraction
@@ -160,10 +131,54 @@ lr1110_hal_status_t lr1110_hal_write(const void * context,
                                      const uint8_t * data, 
                                      const uint16_t data_length)
 {
-    lr1110_hal_wait_busy(context, 2000);
+    if(lr1110_hal_wait_busy(context, 2000)) {
+        return LR1110_HAL_STATUS_ERROR;
+    }
 
     lr1110_set_nss(context, 0);
     lr1110_spi_write(context, command, command_length);
+    lr1110_spi_write(context, data, data_length);
+    lr1110_set_nss(context, 1);
+
+    return LR1110_HAL_STATUS_OK;
+}
+
+
+/*!
+ * @brief                       HAL read
+ *
+ * @param[in] context           Radio abstraction
+ * @param[in] command           Pointer to the buffer to be transmitted
+ * @param[in] command_length    Buffer size to be transmitted
+ * @param[out] data             Pointer to the buffer to be received
+ * @param[in] data_length       Buffer size to be received
+ *
+ * @return status               HAL status
+ */
+lr1110_hal_status_t lr1110_hal_read(const void * context, 
+                                    const uint8_t * command, 
+                                    const uint16_t command_length, 
+                                    uint8_t * data, 
+                                    const uint16_t data_length)
+{
+    uint8_t dummy = 0x00;
+
+    if(lr1110_hal_wait_busy(context, 2000)) {
+        return LR1110_HAL_STATUS_ERROR;
+    }
+
+    /* 1st SPI transaction */
+    lr1110_set_nss(context, 0);
+    lr1110_spi_write(context, command, command_length);
+    lr1110_set_nss(context, 1);
+
+    if(lr1110_hal_wait_busy(context, 2000)) {
+        return LR1110_HAL_STATUS_ERROR;
+    }
+
+    /* 2nd SPI transaction */
+    lr1110_set_nss(context, 0);
+    lr1110_spi_write(context, &dummy, 1);
     lr1110_spi_read(context, data, data_length);
     lr1110_set_nss(context, 1);
 
@@ -186,7 +201,9 @@ lr1110_hal_status_t lr1110_hal_write_read(const void * context,
                                           uint8_t * data, 
                                           const uint16_t data_length)
 {
-    lr1110_hal_wait_busy(context, 2000);
+    if(lr1110_hal_wait_busy(context, 2000)) {
+        return LR1110_HAL_STATUS_ERROR;
+    }
 
     lr1110_set_nss(context, 0);
     lr1110_spi_write_read(context, command, data, data_length);
@@ -201,9 +218,9 @@ lr1110_hal_status_t lr1110_hal_write_read(const void * context,
  *
  * @param[in] context   Radio abstraction
  */
-lr1110_response_code_t lr1110_rf_switch_init(const void * context)
+lr1110_status_t lr1110_rf_switch_init(const void * context)
 {
-    lr1110_system_rfswitch_cfg_s rf_switch_cfg;
+    lr1110_system_rfswitch_cfg_t rf_switch_cfg;
 
     if (((lr1110_t*) context)->rf_switch_cfg != NULL) {
         /* Custom rf switch configuration is used */
@@ -224,9 +241,9 @@ lr1110_response_code_t lr1110_rf_switch_init(const void * context)
  *
  * @return rf_switch_configuration struct
  */
-lr1110_system_rfswitch_cfg_s create_evk_shield_rf_switch()
+static lr1110_system_rfswitch_cfg_t create_evk_shield_rf_switch()
 {
-    lr1110_system_rfswitch_cfg_s rf_switch_configuration;
+    lr1110_system_rfswitch_cfg_t rf_switch_configuration;
 
     rf_switch_configuration.enable  = LR1110_SYSTEM_RFSW0_HIGH | 
                                       LR1110_SYSTEM_RFSW1_HIGH | 
@@ -261,7 +278,7 @@ lr1110_system_rfswitch_cfg_s create_evk_shield_rf_switch()
  * @param[in] context           Radio abstraction
  * @param[in] level             Logical level of slave select line
  */
-static void lr1110_set_nss(cont void * context, uint8_t level)
+static void lr1110_set_nss(const void * context, uint8_t level)
 {
 	gpio_pin_set(((lr1110_t*) context)->nss.port, 
                  ((lr1110_t*) context)->nss.pin, level);
@@ -273,11 +290,11 @@ static void lr1110_set_nss(cont void * context, uint8_t level)
  *
  * @param[in] context           Radio abstraction
  */
-static lr1110_hal_status_t lr1110_hal_reset(const void * context)
+lr1110_hal_status_t lr1110_hal_reset(const void * context)
 {
 	gpio_pin_set(((lr1110_t*) context)->reset.port, 
                  ((lr1110_t*) context)->reset.pin, 0);
-    k_sleep(K_MSEC(1));
+    k_sleep(K_MSEC(500));
 	gpio_pin_set(((lr1110_t*) context)->reset.port, 
                  ((lr1110_t*) context)->reset.pin, 1);
 
@@ -292,7 +309,7 @@ static lr1110_hal_status_t lr1110_hal_reset(const void * context)
  *
  * @return status               HAL status
  */
-static lr1110_hal_status_t lr1110_hal_wakeup(const void * context)
+lr1110_hal_status_t lr1110_hal_wakeup(const void * context)
 {
     lr1110_set_nss(context, 0);
     k_sleep(K_MSEC(1));
@@ -320,6 +337,10 @@ static lr1110_hal_status_t lr1110_hal_wait_busy(const void * context,
     {
         if ((k_uptime_get() - start) > timeout_ms)
         {
+            printk("------------------------------------------------------\n");
+            printk("WAIT BUSY TIMEOUTED\n");
+            printk("THIS SHOULD NOT HAPPEN\n");
+            printk("------------------------------------------------------\n");
             return LR1110_HAL_STATUS_ERROR;
         }
     }
@@ -346,7 +367,7 @@ static void lr1110_spi_write(const void * context,
     };
 
     const struct spi_buf_set tx = {
-        .buffers = tx_buf,
+        .buffers = &tx_buf,
         .count = 1
     };
 
@@ -364,6 +385,8 @@ static void lr1110_spi_write(const void * context,
  * @note                        NSS line is toggled manually.
  */
 static void lr1110_spi_read(const void * context,
+                            //uint8_t *command, 
+                            //uint8_t size_command,
                             uint8_t * data, 
                             uint16_t data_length)
 {
@@ -373,7 +396,7 @@ static void lr1110_spi_read(const void * context,
     };
 
     const struct spi_buf_set rx = {
-        .buffers = rx_buf,
+        .buffers = &rx_buf,
         .count = 1
     };
 
@@ -393,14 +416,14 @@ static void lr1110_spi_read(const void * context,
 static void lr1110_spi_write_read(const void * context, 
                                   const uint8_t * command, 
                                   uint8_t * data,
-                                  const uint16_t data_length);
+                                  const uint16_t data_length)
 {
-    struct spi_buf tx_buf = {
-        .buf = command,
+    const struct spi_buf tx_buf = {
+        .buf = (uint8_t*) command,
         .len = data_length
     };
     struct spi_buf rx_buf = {
-        .buf = rbuffer,
+        .buf = data,
         .len = data_length
     };
 
@@ -408,7 +431,7 @@ static void lr1110_spi_write_read(const void * context,
       .buffers = &tx_buf,
       .count = 1
     };
-    const struct spi_buf_set rx = {
+    struct spi_buf_set rx = {
       .buffers = &rx_buf,
       .count = 1
     };
