@@ -56,8 +56,7 @@ void lr1110_set_device_config(void * context, const char * device);
 
 void lr1110_get_trx_version(const void * context, 
                             lr1110_system_version_t * lr1110_version);
-void lr1110_display_trx_version(lr1110_system_version_t lr1110_version);
-
+void lr1110_display_trx_version(const void * context);
 
 void lr1110_prepare_event(void * context, lr1110_system_irq_mask_t event_mask);
 void lr1110_wait_for_event(void * context);

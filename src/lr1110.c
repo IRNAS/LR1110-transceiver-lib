@@ -1,6 +1,6 @@
 /** @file lr1110.c
  * 
- * @brief       Main lr1110.h file that calls all other modules. 
+ * @brief       Main lr1110.c file that calls all other modules. 
  *              Only this file should be included into application.
  *      
  *
@@ -28,7 +28,6 @@
  * PUBLIC IMPLEMENTATIONS
  * ------------------------------------------------------------------------- */
 
-
 void lr1110_init(const void * context)
 {
     lr1110_gpio_init(context);
@@ -47,13 +46,15 @@ void lr1110_init(const void * context)
         printk("RF switch init failed\n");
     }
 
-    if (lr1110_system_set_tcxo_mode(context, LR1110_SYSTEM_TCXO_CTRL_3_0V, 500)){
+    if (lr1110_system_set_tcxo_mode(context, 
+                                    LR1110_SYSTEM_TCXO_CTRL_3_0V, 
+                                    500)){
         printk("Setting tcxo failed\n");
-
     }
+
     lr1110_system_cfg_lfclk(context, LR1110_SYSTEM_LFCLK_XTAL, true);
     lr1110_system_clear_errors(context);
-    lr1110_system_calibrate(context, 0x3F);
+    lr1110_system_calibrate(context, 0x3F); /* Value from Semtech's examples */
 
     uint16_t errors;
     lr1110_system_get_errors(context, &errors);
@@ -71,8 +72,14 @@ void lr1110_get_trx_version(const void * context,
 }
 
 
-void lr1110_display_trx_version(lr1110_system_version_t lr1110_version)
+void lr1110_display_trx_version(const void * context)
 {
+    lr1110_system_version_t lr1110_version;
+    lr1110_get_trx_version(context, &lr1110_version);
+
+    printk("**************************************************************\n");
+    printk("*                           VERSION                          *\n");
+    printk("**************************************************************\n");
     printk("HARDWARE : 0x%02X\n",    lr1110_version.hw);
     printk("TYPE     : 0x%02X\n",    lr1110_version.type);
     printk("FIRMWARE : 0x%04X\n\n",  lr1110_version.fw);

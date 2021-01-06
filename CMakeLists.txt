@@ -11,7 +11,7 @@ if (NOT DEFINED NO_EXAMPLES)
     #     ${CMAKE_CURRENT_LIST_DIR}/boards/nrf9160dk_nrf9160spm.conf)
     find_package(Zephyr HINTS $ENV{ZEPHYR_BASE})
 
-    project(LR1110_modem_lib)
+    project(LR1110_transceiver_lib)
     zephyr_compile_options(-fdiagnostics-color=always)
     set(CMAKE_BUILD_TYPE Debug)
 

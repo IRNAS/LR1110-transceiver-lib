@@ -39,7 +39,7 @@ struct wifi_diagnostics {
 void lr1110_init_wifi_scan(void * context);
 struct wifi_diagnostics
 lr1110_execute_wifi_scan(void * context, struct wifi_settings wifi_settings);
-struct wifi_settings lr1110_get_default_wifi_settings(void * context);
+struct wifi_settings lr1110_get_default_wifi_settings();
 void 
 lr1110_get_wifi_scan_results(void * context, 
                              struct wifi_diagnostics wifi_diagnostics,
