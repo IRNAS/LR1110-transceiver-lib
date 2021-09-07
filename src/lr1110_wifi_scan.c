@@ -1,11 +1,11 @@
 /** @file lr1110_wifi_scan.c
- * 
- * @brief       Module containing various function wrappers for wifi scanning.
- *      
  *
- * @par       
+ * @brief       Module containing various function wrappers for wifi scanning.
+ *
+ *
+ * @par
  * COPYRIGHT NOTICE: (c) 2021 Irnas.  All rights reserved.
- */ 
+ */
 
 #include "lr1110_wifi_scan.h"
 #include "lr1110.h"
@@ -36,7 +36,7 @@ struct wifi_settings lr1110_get_default_wifi_settings()
     struct wifi_settings wifi_settings = {
         .signal_type            = LR1110_WIFI_TYPE_SCAN_B_G_N,
         .channels               = LR1110_WIFI_ALL_CHANNELS,
-        .scan_mode              = LR1110_WIFI_SCAN_MODE_BEACON_AND_PKT,
+        .scan_mode              = LR1110_WIFI_SCAN_MODE_FULL_BEACON,
         .max_results            = LR1110_WIFI_MAX_RESULTS,
         .nb_scan_per_channel    = 30,
         .timeout_in_ms          = 110,
@@ -56,16 +56,16 @@ lr1110_execute_wifi_scan(void * context, struct wifi_settings wifi_settings)
 
     uint32_t start_scan = k_uptime_get();
 
-    /* Start up wifi scan, function itself is not blocking, 
-     * however, we wait for WIFI_SCAN_DONE event, 
+    /* Start up wifi scan, function itself is not blocking,
+     * however, we wait for WIFI_SCAN_DONE event,
      * as it currently does not make sense to implement interrupt. */
-    lr1110_wifi_scan(context, 
-                     wifi_settings.signal_type, 
-                     wifi_settings.channels, 
-                     wifi_settings.scan_mode, 
-                     wifi_settings.max_results, 
-                     wifi_settings.nb_scan_per_channel, 
-                     wifi_settings.timeout_in_ms, 
+    lr1110_wifi_scan(context,
+                     wifi_settings.signal_type,
+                     wifi_settings.channels,
+                     wifi_settings.scan_mode,
+                     wifi_settings.max_results,
+                     wifi_settings.nb_scan_per_channel,
+                     wifi_settings.timeout_in_ms,
                      wifi_settings.abort_on_timeout);
 
     /* Blocking wait */
@@ -80,6 +80,7 @@ lr1110_execute_wifi_scan(void * context, struct wifi_settings wifi_settings)
     /* Get number of wifi scan results */
     start_scan = k_uptime_get();
     lr1110_wifi_get_nb_results(context, &wifi_diagnostics.num_wifi_results);
+    printk("Number of resutls: %d\n", wifi_diagnostics.num_wifi_results);
     end_scan = k_uptime_get();
 
     wifi_diagnostics.result_fetch_duration = end_scan - start_scan;
@@ -87,32 +88,46 @@ lr1110_execute_wifi_scan(void * context, struct wifi_settings wifi_settings)
 }
 
 
-void 
-lr1110_get_wifi_scan_results(void * context, 
+void
+lr1110_get_wifi_scan_results(void * context,
                              struct wifi_diagnostics wifi_diagnostics,
                              lr1110_wifi_basic_complete_result_t * results)
 {
-    lr1110_wifi_read_basic_complete_results(context, 
+    lr1110_wifi_read_basic_complete_results(context,
                                             0,  /* start result index */
                                             wifi_diagnostics.num_wifi_results,
                                             results);
 }
 
 
-void 
+void
+lr1110_get_ext_wifi_scan_results(void * context,
+                                 struct wifi_diagnostics wifi_diagnostics,
+                                 lr1110_wifi_extended_full_result_t * results)
+{
+    printk("start1\n");
+    lr1110_wifi_read_extended_full_results(context,
+                                           0,
+                                           wifi_diagnostics.num_wifi_results,
+                                           results);
+    printk("start2\n");
+}
+
+
+void
 lr1110_print_wifi_scan_results(void * contex,
                                struct wifi_diagnostics wifi_diagnostics,
-                              lr1110_wifi_basic_complete_result_t * results)
+                               lr1110_wifi_basic_complete_result_t * results)
 {
 
     printk("**************************************************************\n");
     printk("*                      WIFI SCAN RESULTS                     *\n");
     printk("**************************************************************\n");
-    printk("Scan duration:          %d ms\n", 
+    printk("Scan duration:          %d ms\n",
             wifi_diagnostics.wifi_scan_duration);
-    printk("Fetch result duration:  %d ms\n", 
+    printk("Fetch result duration:  %d ms\n",
             wifi_diagnostics.result_fetch_duration);
-    printk("Number of wifi results: %d\n", 
+    printk("Number of wifi results: %d\n",
             wifi_diagnostics.num_wifi_results);
 
     /* Print results*/
@@ -128,6 +143,54 @@ lr1110_print_wifi_scan_results(void * contex,
     }
 }
 
+void
+lr1110_print_ext_wifi_scan_results(void * contex,
+                                   struct wifi_diagnostics wifi_diagnostics,
+                                   lr1110_wifi_extended_full_result_t * results)
+{
+
+    printk("**************************************************************\n");
+    printk("*                 EXTENDED WIFI SCAN RESULTS                 *\n");
+    printk("**************************************************************\n");
+    printk("Scan duration:          %d ms\n",
+            wifi_diagnostics.wifi_scan_duration);
+    printk("Fetch result duration:  %d ms\n",
+            wifi_diagnostics.result_fetch_duration);
+    printk("Number of wifi results: %d\n",
+            wifi_diagnostics.num_wifi_results);
+
+    /* Print results*/
+    for (int i = 0; i < wifi_diagnostics.num_wifi_results; i++)
+    {
+        printk("{\n\t\"macAddress\": \"");
+        for (int j = 0; j < LR1110_WIFI_MAC_ADDRESS_LENGTH; j++)
+        {
+            printk(" %02x:", results[i].mac_address_1[j]);
+        }
+        printk("\",\n\t\"signalStrength\": ");
+        printk("%d\n},\n", results[i].rssi);
+    }
+    for (int i = 0; i < wifi_diagnostics.num_wifi_results; i++)
+    {
+        printk("{\n\t\"macAddress\": \"");
+        for (int j = 0; j < LR1110_WIFI_MAC_ADDRESS_LENGTH; j++)
+        {
+            printk(" %02x:", results[i].mac_address_2[j]);
+        }
+        printk("\",\n\t\"signalStrength\": ");
+        printk("%d\n},\n", results[i].rssi);
+    }
+    for (int i = 0; i < wifi_diagnostics.num_wifi_results; i++)
+    {
+        printk("{\n\t\"macAddress\": \"");
+        for (int j = 0; j < LR1110_WIFI_MAC_ADDRESS_LENGTH; j++)
+        {
+            printk(" %02x:", results[i].mac_address_3[j]);
+        }
+        printk("\",\n\t\"signalStrength\": ");
+        printk("%d\n},\n", results[i].rssi);
+    }
+}
 /* -------------------------------------------------------------------------
  * PRIVATE IMPLEMENTATIONS
  * ------------------------------------------------------------------------- */

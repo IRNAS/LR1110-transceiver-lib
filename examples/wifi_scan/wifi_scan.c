@@ -24,15 +24,18 @@ int main()
 
     lr1110_init_wifi_scan(&lr1110);
 
-    lr1110_wifi_basic_complete_result_t results[LR1110_WIFI_MAX_RESULTS] = {0};
+    //lr1110_wifi_basic_complete_result_t results[LR1110_WIFI_MAX_RESULTS] = {0};
+    lr1110_wifi_extended_full_result_t results[32] = {0};
 
     while(1)
     {
         struct wifi_diagnostics wifi_diagnostics = 
             lr1110_execute_wifi_scan(&lr1110, wifi_settings);
 
-        lr1110_get_wifi_scan_results(&lr1110, wifi_diagnostics, results);
-        lr1110_print_wifi_scan_results(&lr1110, wifi_diagnostics, results);
+        //lr1110_get_wifi_scan_results(&lr1110, wifi_diagnostics, results);
+        lr1110_get_ext_wifi_scan_results(&lr1110, wifi_diagnostics, results);
+        //lr1110_print_wifi_scan_results(&lr1110, wifi_diagnostics, results);
+        lr1110_print_ext_wifi_scan_results(&lr1110, wifi_diagnostics, results);
 
         k_sleep(K_MSEC(1000));
     }
